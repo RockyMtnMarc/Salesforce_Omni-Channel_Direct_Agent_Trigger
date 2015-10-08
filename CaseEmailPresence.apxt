@@ -1,0 +1,56 @@
+//Code courtesy of Anurodh Agarwal //
+
+trigger CaseEmailPresence on EmailMessage (after insert) {
+
+system.debug('start variable assignments');
+    List<AgentWork> Aw = new List<AgentWork>();
+    List<Case> CaseList = new List<Case>();
+
+    //This is the developer Service Channel name found in Setup|Omni|Service Channels
+    ServiceChannel SC = [select Id from ServiceChannel where DeveloperName = 'Cases'];
+    
+    //This is the developer Queue name found in Setup|Manage Users|Queues
+    Group Grp = [select Id,Name from Group where DeveloperName = 'Tier1Queue'];  
+system.debug('complete variable assignments');    
+
+
+    for (EmailMessage a:trigger.new)
+    {
+      
+      if(a.Incoming == true)
+      {  
+        
+        System.Debug('EmailMessageId: '+ a.Id);
+        System.Debug('CaseId: '+ a.ParentId);
+
+        
+        CaseList = [Select Id,OwnerId from Case where Id = :a.ParentId limit 1];
+        
+
+        System.Debug('OwnerId: ' + CaseList[0].OwnerId);
+        
+        List<UserServicePresence> usp = [select Id,UserId from UserServicePresence where UserId = :CaseList[0].OwnerId and ServicePresenceStatusId != ''];
+        
+        if (usp.size() > 0 && usp[0].UserId != null)
+        {
+            System.debug('UserId:' + usp[0].UserId);
+            System.debug('ServiceChannel:' + Sc.Id);
+            System.debug('CaseId: ' + a.Parent.Id);
+            
+            Aw.add(new AgentWork(UserId = usp[0].UserId, WorkItemId = a.ParentId,ServiceChannelId=SC.Id));
+            System.Debug('Aw.add executed');
+        }
+        else
+        CaseList[0].OwnerId =  Grp.Id;
+        
+       
+        
+    }
+    insert Aw;
+    System.Debug('insert Aw executed.');
+    update CaseList;
+    System.Debug('update CaseList executed.');
+}  
+
+  
+}
